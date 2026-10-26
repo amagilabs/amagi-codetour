@@ -188,7 +188,7 @@ def cmd_generate(args) -> int:
         if not out.is_absolute():
             out = root / out
         if out.exists() and not args.force:
-            _err(f"{out} exists; use --force to overwrite or -o to pick another name")
+            _err(f"{args.output} exists; use --force to overwrite or -o to pick another name")
             return 2
         write_tour(tour, out)
         files = {norm_path(s["file"]) for s in tour["steps"] if "file" in s}

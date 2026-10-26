@@ -41,6 +41,7 @@ def test_generate_static_then_check(py_repo, capsys):
     assert "0 broken, 0 warnings -> OK" in capsys.readouterr().out
     # refuses to overwrite without --force
     assert run("generate", py_repo, "--engine", "static") == 2
+    assert "amagi-codetour: .tours/getting-started.tour exists; use --force" in capsys.readouterr().err
     assert run("generate", py_repo, "--engine", "static", "--force", "-q") == 0
 
 
