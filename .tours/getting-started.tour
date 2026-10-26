@@ -41,7 +41,7 @@
     },
     {
       "file": "src/amagi_codetour/plan.py",
-      "line": 203,
+      "line": 204,
       "title": "Ranking files into a plan",
       "description": "`build_plan` is the static brain behind both `plan` and `generate`. It builds the import graph, finds entry points, and runs `_bfs` from the strongest entries. Each file's score comes from entry status, import hops, number of importers, size, `NAME_HINTS` and penalties for trivial or low-value files. It then picks between `min_files` and `max_files` files, puts them in breadth-first reading order, and gives each `FilePick` an anchor line.",
       "pattern": "^\\s*def build_plan\\(repo, min_files: int = 8, max_files: int = 15\\) -> Plan:"
@@ -69,7 +69,7 @@
     },
     {
       "file": "src/amagi_codetour/plan.py",
-      "line": 103,
+      "line": 104,
       "title": "Choosing each anchor line",
       "description": "`_choose_anchor` picks the line a static step points at. If the entry point names a function (the `symbol` from a console script), that function's line wins. Next come the names that other tour files import most, then an `if __name__ == \"__main__\"` block or `main`, and finally the first public class or function. This decides the `anchor_line` and `anchor_symbol` that `plan` prints.",
       "pattern": "^\\s*def _choose_anchor\\(pick, sf, entry, imported_names\\):"

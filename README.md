@@ -36,7 +36,7 @@ Entry points:
 Tour order (10 files):
    1. src/amagi_codetour/cli.py:260      main  [117]
    2. src/amagi_codetour/check.py:59     norm_path  [31.68]
-   3. src/amagi_codetour/plan.py:203     build_plan  [27]
+   3. src/amagi_codetour/plan.py:204     build_plan  [27]
    4. src/amagi_codetour/scan.py:156     scan  [31.68]
    5. src/amagi_codetour/tour.py:90      static_tour  [35]
    6. src/amagi_codetour/llm.py:53       build_prompt  [27]
