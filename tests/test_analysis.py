@@ -7,7 +7,7 @@ from pathlib import Path
 
 from amagi_codetour.entry import find_entries
 from amagi_codetour.graph import build_graph, reverse_edges
-from amagi_codetour.plan import build_plan
+from amagi_codetour.plan import build_plan, project_name
 from amagi_codetour.scan import is_low_value_path, is_test_path, scan
 from amagi_codetour.symbols import file_symbols
 
@@ -136,3 +136,20 @@ def test_plan_and_static_tour_do_not_depend_on_hash_seed(py_repo, js_repo):
             cmd = [sys.executable, "-m", "amagi_codetour", "generate", str(repo), "--engine", "static", "--stdout"]
             outs.add(subprocess.run(cmd, capture_output=True, text=True, env=env, check=True).stdout)
         assert len(outs) == 1
+
+
+def test_project_name_comes_from_the_manifest_not_the_folder(tmp_path):
+    cases = {
+        "py": {"pyproject.toml": '[build-system]\nrequires = ["x"]\nname = "wrong"\n\n[project]\nname = "taskq"\n'},
+        "poetry": {"pyproject.toml": '[tool.poetry]\nname = "poet"\n'},
+        "js": {"package.json": '{"name": "@acme/widget", "version": "1.0.0"}'},
+        "rs": {"Cargo.toml": '[workspace]\n\n[package]\nname = "crab"\n'},
+        "go": {"go.mod": "module github.com/acme/gopher\n\ngo 1.22\n"},
+        "none": {"main.py": "print(1)\n"},
+        "badjson": {"package.json": "{not json"},
+    }
+    want = {"py": "taskq", "poetry": "poet", "js": "@acme/widget", "rs": "crab", "go": "gopher", "none": "src", "badjson": "src"}
+    for key, files in cases.items():
+        root = tmp_path / key / "src"
+        write_tree(root, files)
+        assert project_name(scan(root)) == want[key], key

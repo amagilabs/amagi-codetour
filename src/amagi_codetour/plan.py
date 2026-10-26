@@ -7,6 +7,7 @@ hints. The LLM engines start from this plan; `--engine static` uses it as-is.
 from __future__ import annotations
 
 import ast
+import json
 import math
 import posixpath
 import re
@@ -297,4 +298,36 @@ def build_plan(repo, min_files: int = 8, max_files: int = 15) -> Plan:
     readme = next((r for r in README_NAMES if r in repo.paths), "")
     test_dir, test_cmd = _test_info(repo, entries)
     langs = Counter(sf.lang for sf in repo.files.values())
-    return Plan(str(repo.root), repo.root.name, entries, picks, ranked, readme, test_dir, test_cmd, dict(langs.most_common()), edges)
+    return Plan(str(repo.root), project_name(repo), entries, picks, ranked, readme, test_dir, test_cmd, dict(langs.most_common()), edges)
+
+
+def _toml_name(lines, sections):
+    current = None
+    for text in lines:
+        s = text.strip()
+        if s.startswith("["):
+            current = s.strip("[] ")
+            continue
+        if current in sections:
+            m = re.match(r"""name\s*=\s*["']([^"']+)["']""", s)
+            if m:
+                return m.group(1)
+    return ""
+
+
+def project_name(repo) -> str:
+    """The name the project calls itself (pyproject, package.json, Cargo.toml, go.mod), else the folder name."""
+    lines = repo.read("pyproject.toml")
+    name = _toml_name(lines, {"project", "tool.poetry"}) if lines else ""
+    if not name and (lines := repo.read("package.json")):
+        try:
+            data = json.loads("\n".join(lines))
+            name = data.get("name", "") if isinstance(data, dict) and isinstance(data.get("name"), str) else ""
+        except ValueError:
+            pass
+    if not name and (lines := repo.read("Cargo.toml")):
+        name = _toml_name(lines, {"package"})
+    if not name and (lines := repo.read("go.mod")):
+        m = re.match(r"\s*module\s+(\S+)", "\n".join(lines))
+        name = m.group(1).rstrip("/").rsplit("/", 1)[-1] if m else ""
+    return name.strip() or repo.root.name
