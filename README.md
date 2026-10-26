@@ -1,6 +1,6 @@
 # amagi-codetour
 
-Generate a VS Code CodeTour for any repo: Claude traces the entry point and the 8 to 15 files a newcomer needs, writes one step per important line, and every step is checked against the code before the tour is saved.
+Generate a VS Code CodeTour for any repo. Claude walks from the entry point through the 8 to 15 files a newcomer needs, and every step is checked against the code before the tour is saved.
 
 ![amagi-codetour planning a tour, then catching steps that drifted after an edit and moving them back](https://raw.githubusercontent.com/amagilabs/amagi-codetour/main/assets/demo.gif)
 
@@ -29,22 +29,43 @@ amagi-codetour check . --fix               # move drifted steps to where their c
 
 ```
 $ amagi-codetour plan .
-PLAN_OUTPUT
+amagi-codetour: 17 source files (python 17)
+Entry points:
+  src/amagi_codetour/cli.py  (console script `amagi-codetour` -> `amagi_codetour.cli:main` (pyproject.toml))
+  src/amagi_codetour/__main__.py  (`python -m` entry (`__main__.py`))
+Tour order (10 files):
+   1. src/amagi_codetour/cli.py:260      main  [117]
+   2. src/amagi_codetour/check.py:59     norm_path  [31.68]
+   3. src/amagi_codetour/plan.py:203     build_plan  [27]
+   4. src/amagi_codetour/scan.py:156     scan  [31.68]
+   5. src/amagi_codetour/tour.py:90      static_tour  [35]
+   6. src/amagi_codetour/llm.py:53       build_prompt  [27]
+   7. src/amagi_codetour/anchors.py:22   pattern_for  [30]
+   8. src/amagi_codetour/entry.py:204    find_entries  [22]
+   9. src/amagi_codetour/graph.py:258    build_graph  [26.68]
+  10. src/amagi_codetour/symbols.py:168  file_symbols  [22]
 ```
 
-The number in brackets is the file's score: entry points, distance from the entry point, how many other files import it, and its size. The symbol is the line each step will point at.
+The number in brackets is the file's score. It comes from whether the file is an entry point, how far it sits from one, how many other files import it, and its size. The name after each path is the definition that file's step will point at.
 
-`generate` sends the numbered source of those files to Claude and asks for a tour where every step quotes the line it points at. The tool then looks each quote up in the file. A step whose quote is not in the file is dropped, with a note. A step whose line number is off is moved to the line that holds the quote. Then the finished tour goes through `check` before it is written:
+`generate` sends the numbered source of those files to Claude and asks for a tour where every step quotes the line it points at. The tool then looks each quote up in the file. If the quote isn't there, the step is dropped and you get a note. If only the line number is off, the step moves to the line that holds the quote. The finished tour goes through `check` before it is written:
 
 ```
-$ amagi-codetour generate .
-GENERATE_OUTPUT
+$ amagi-codetour generate . --force
+Asking claude to trace amagi-codetour (12 candidate files)...
+Wrote .tours/getting-started.tour: 18 steps across 11 files (claude engine), all anchors verified.
 ```
 
 Each step stores the line number and a `pattern` copied from that line, which is how `check` tells when the code moved under the tour:
 
 ```json
-STEP_JSON
+{
+  "file": "src/amagi_codetour/cli.py",
+  "line": 260,
+  "title": "CLI entry point",
+  "description": "Execution starts here. pyproject.toml maps the `amagi-codetour` console script to `amagi_codetour.cli:main`. `main` switches stdout and stderr to UTF-8, builds the parser with `build_parser`, and calls `args.func(args)`, which is `cmd_generate`, `cmd_plan` or `cmd_check` depending on the subcommand. It turns `SystemExit` and `KeyboardInterrupt` into plain exit codes.",
+  "pattern": "^\\s*def main\\(argv=None\\) -> int:"
+}
 ```
 
 ### Keeping tours accurate
@@ -53,9 +74,14 @@ Tours go stale quietly. Someone adds a function above the one a step points at, 
 
 ```
 $ amagi-codetour check .
-CHECK_FAIL
+.tours/getting-started.tour: 'Getting started with amagi-codetour': 17 steps, 3 broken, 0 warnings -> FAIL
+  [FAIL] step 1 src/amagi_codetour/cli.py:255: code moved: anchored text is now at line 260
+  [FAIL] step 3 src/amagi_codetour/cli.py:209: anchored line is blank; code moved: anchored text is now at line 213
+  [FAIL] step 6 src/amagi_codetour/plan.py:198: code moved: anchored text is now at line 203
+Run again with --fix to move drifted steps to where their code is now.
 $ amagi-codetour check . --fix
-FIX_OUTPUT
+getting-started.tour: fixed 3 step(s)
+.tours/getting-started.tour: 'Getting started with amagi-codetour': 17 steps, 0 broken, 0 warnings -> OK
 ```
 
 `check` exits 1 when any step is broken, so it can run in CI or a pre-commit hook. A step fails when its file is gone, its line is past the end of the file, or the line no longer matches its `pattern`. It warns when a description names an identifier in backticks that does not appear in the file. `--strict` turns warnings into failures. `--fix` only moves steps whose anchored line still exists somewhere in the file. If the code was deleted, regenerate.
