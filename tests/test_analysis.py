@@ -1,5 +1,10 @@
 """Scanning, the import graph, entry points and the file plan, on fixture repos."""
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 from amagi_codetour.entry import find_entries
 from amagi_codetour.graph import build_graph, reverse_edges
 from amagi_codetour.plan import build_plan
@@ -120,3 +125,14 @@ def test_colocated_tests_get_no_directory_step(js_repo, go_repo):
     assert plan.test_dir == "" and plan.test_cmd == "npm test"
     plan = build_plan(scan(go_repo))
     assert plan.test_dir == "" and plan.test_cmd == "go test ./..."
+
+
+def test_plan_and_static_tour_do_not_depend_on_hash_seed(py_repo, js_repo):
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    for repo in (py_repo, js_repo):
+        outs = set()
+        for seed in ("1", "2", "3"):
+            env = {**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": src}
+            cmd = [sys.executable, "-m", "amagi_codetour", "generate", str(repo), "--engine", "static", "--stdout"]
+            outs.add(subprocess.run(cmd, capture_output=True, text=True, env=env, check=True).stdout)
+        assert len(outs) == 1

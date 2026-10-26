@@ -114,7 +114,7 @@ def _choose_anchor(pick, sf, entry, imported_names):
         name, n = item
         s = by_name.get(name)
         weak = name.endswith(("Error", "Exception")) or (s is not None and s.kind == "const")
-        return (-n, weak)
+        return (-n, weak, s.line if s is not None else 1 << 30, name)  # ties: earliest definition, never set order
 
     for name, n in sorted(imported_names.items(), key=_rank):
         if name == "default":
