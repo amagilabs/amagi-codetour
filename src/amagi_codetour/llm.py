@@ -202,12 +202,12 @@ def run_claude_cli(prompt: str, model: str = "", timeout: int = 900) -> str:
     cmd = [exe, "-p", "--output-format", "text"]
     if model:
         cmd += ["--model", model]
-    with tempfile.TemporaryDirectory(prefix="amagi-codetour-") as tmp:
-        try:
-            proc = subprocess.run(cmd, input=SYSTEM + "\n\n" + prompt, capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace", timeout=timeout, cwd=tmp)
-        except subprocess.TimeoutExpired:
-            raise EngineError(f"`claude -p` did not answer within {timeout}s") from None
+    # run outside the repo: everything the model needs is in the prompt
+    try:
+        proc = subprocess.run(cmd, input=SYSTEM + "\n\n" + prompt, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout, cwd=tempfile.gettempdir())
+    except subprocess.TimeoutExpired:
+        raise EngineError(f"`claude -p` did not answer within {timeout}s") from None
     if proc.returncode != 0:
         raise EngineError(f"`claude -p` exited {proc.returncode}: {(proc.stderr or proc.stdout).strip()[:400]}")
     return proc.stdout
