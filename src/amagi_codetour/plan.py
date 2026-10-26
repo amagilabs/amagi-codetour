@@ -109,12 +109,17 @@ def _choose_anchor(pick, sf, entry, imported_names):
     if entry and entry.symbol and entry.symbol in by_name:
         s = by_name[entry.symbol]
         return s.line, s.name, f"the `{s.name}` function the entry point calls"
-    # prefer real entry points (functions, classes) over exceptions and constants
+    # prefer real entry points (functions, classes) over exceptions and constants;
+    # on a tie, a name that matches the file (scan() in scan.py), then definition order
+    stem = posixpath.splitext(posixpath.basename(pick.path))[0].lower().replace("-", "_")
+
     def _rank(item):
         name, n = item
         s = by_name.get(name)
         weak = name.endswith(("Error", "Exception")) or (s is not None and s.kind == "const")
-        return (-n, weak, s.line if s is not None else 1 << 30, name)  # ties: earliest definition, never set order
+        low = name.lower()
+        named = 0 if low == stem else 1 if stem and stem in low else 2
+        return (-n, weak, named, s.line if s is not None else 1 << 30, name)
 
     for name, n in sorted(imported_names.items(), key=_rank):
         if name == "default":
