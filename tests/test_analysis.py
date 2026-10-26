@@ -144,7 +144,7 @@ def test_project_name_comes_from_the_manifest_not_the_folder(tmp_path):
         "poetry": {"pyproject.toml": '[tool.poetry]\nname = "poet"\n'},
         "js": {"package.json": '{"name": "@acme/widget", "version": "1.0.0"}'},
         "rs": {"Cargo.toml": '[workspace]\n\n[package]\nname = "crab"\n'},
-        "go": {"go.mod": "module github.com/acme/gopher\n\ngo 1.22\n"},
+        "go": {"go.mod": "module example.com/acme/gopher\n\ngo 1.22\n"},
         "none": {"main.py": "print(1)\n"},
         "badjson": {"package.json": "{not json"},
     }
