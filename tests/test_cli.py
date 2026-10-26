@@ -111,3 +111,11 @@ def test_generate_pattern_only_and_stdout(py_repo, capsys):
 def test_bad_path_is_usage_error(tmp_path, capsys):
     assert run("plan", tmp_path / "missing") == 2
     assert "not a directory" in capsys.readouterr().err
+
+
+def test_print_prompt(py_repo, capsys):
+    assert run("generate", py_repo, "--print-prompt") == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Repository: taskq")
+    assert "## File: src/taskq/cli.py" in out
+    assert not (py_repo / ".tours").exists()

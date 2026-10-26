@@ -149,6 +149,10 @@ def cmd_generate(args) -> int:
         plan = build_plan(repo, args.min_files, args.max_files)
     except ValueError as e:
         return _usage_error(str(e))
+    if args.print_prompt:
+        # for pasting into any chat model; the reply can be fed back with --llm-cmd "cat reply.json"
+        print(llm.build_prompt(repo, plan, args.min_files, args.max_files, args.title))
+        return 0
     engine = llm.pick_engine(args.engine, args.llm_cmd)
     with_readme = not args.no_readme
     notes = []
@@ -229,6 +233,7 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--no-readme", action="store_true", help="do not open the tour on the README")
     g.add_argument("--pattern-only", action="store_true", help="anchor steps by pattern only (no line numbers)")
     g.add_argument("--stdout", action="store_true", help="print the tour instead of writing it")
+    g.add_argument("--print-prompt", action="store_true", help="print the prompt the LLM engines would send, then exit")
     g.add_argument("--force", action="store_true", help="overwrite an existing tour file")
     g.add_argument("-q", "--quiet", action="store_true", help="only print the summary line")
     g.set_defaults(func=cmd_generate)
