@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from .entry import find_entries
 from .graph import build_graph, reverse_edges
-from .scan import is_low_value_path, is_test_path
+from .scan import TEST_DIR_NAMES, is_low_value_path, is_test_path
 from .symbols import file_symbols
 
 NAME_HINTS = {
@@ -165,16 +165,17 @@ def _trivial_python(text: str) -> bool:
 
 def _test_info(repo, entries):
     test_files = [p for p in repo.files if is_test_path(p)]
+    # a tests/ (spec/, __tests__/ ...) folder gets its own tour step; colocated tests do not
+    dirs = Counter()
+    for p in test_files:
+        parts = p.split("/")[:-1]
+        for i, part in enumerate(parts):
+            if part.lower() in TEST_DIR_NAMES:
+                dirs["/".join(parts[: i + 1])] += 1
+                break
     test_dir = ""
-    if test_files:
-        tops = Counter(p.split("/")[0] if "/" in p else "" for p in test_files)
-        top, _ = tops.most_common(1)[0]
-        if top and repo.exists(top) and (repo.root / top).is_dir():
-            test_dir = top
-        else:
-            dirs = Counter(posixpath.dirname(p) for p in test_files)
-            d, _ = dirs.most_common(1)[0]
-            test_dir = d
+    if dirs:
+        test_dir = min(dirs.items(), key=lambda kv: (-kv[1], kv[0].count("/"), kv[0]))[0]
     cmd = ""
     langs = Counter(repo.files[p].lang for p in test_files)
     lang = langs.most_common(1)[0][0] if langs else ""

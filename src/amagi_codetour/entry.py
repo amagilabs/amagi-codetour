@@ -101,7 +101,7 @@ def js_entries(repo):
         def add(target, reason, strength):
             if not isinstance(target, str):
                 return
-            t = posixpath.normpath(posixpath.join(base, target)).lstrip("./") if target else ""
+            t = posixpath.normpath(posixpath.join(base, target)) if target else ""
             for cand in _js_source_for(t, repo):
                 out.append(Entry(cand, reason, strength - depth_penalty))
                 return
