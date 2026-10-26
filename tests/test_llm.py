@@ -77,6 +77,7 @@ def test_resolve_steps_fills_from_static_plan_when_model_covers_too_few_files(py
     files = {s["file"] for s in tour["steps"] if "file" in s and s["file"] != "README.md"}
     assert len(files) == 8
     assert any("added 6 from the static plan" in n for n in notes)
+    assert "walks through 8 files in reading order, starting at the entry point `src/taskq/cli.py`" in tour["steps"][0]["description"]
     assert check_tour(repo, tour).ok
 
 

@@ -179,7 +179,7 @@ def resolve_steps(repo, plan, data: dict, min_files: int = 8, max_files: int = 1
         raise EngineError("none of the model's steps could be anchored to the code")
     out = []
     if with_readme and readme:
-        out.append(readme_step(plan, repo))
+        out.append(readme_step(plan, repo, files))
     out += steps
     if with_tests and plan.test_dir:
         out.append(tests_step(plan))

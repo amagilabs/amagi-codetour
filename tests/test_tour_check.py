@@ -144,3 +144,17 @@ def test_schema_errors():
     assert "step 1: `line` must be a number" in errs
     assert "step 1: `file` must be a string" in errs
     assert "step 2: not an object" in errs
+
+
+def test_mentions_may_point_at_a_later_tour_file(py_repo):
+    repo = scan(py_repo)
+    queue = repo.read("src/taskq/queue.py")
+    line = queue.index("class JobQueue:") + 1
+    tour = {"title": "t", "steps": [
+        {"file": "src/taskq/queue.py", "line": line, "pattern": pattern_for("class JobQueue:"),
+         "description": "`JobQueue` hands jobs to `with_retry`."},
+        {"file": "src/taskq/retry.py", "line": 1, "pattern": pattern_for(repo.read("src/taskq/retry.py")[0]),
+         "description": "Retries."},
+    ]}
+    report = check_tour(repo, tour)
+    assert report.steps[0].status == "ok", report.steps[0].messages

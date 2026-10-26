@@ -154,12 +154,16 @@ def check_tour(repo, tour: dict, path: str = "", check_mentions: bool = True) ->
             elif len(hits) > 1:
                 r.status = "warn"
                 r.messages.append(f"pattern matches {len(hits)} lines; CodeTour uses the first")
-        if check_mentions and r.status != "fail":
+    if check_mentions:
+        # after the loop, so a mention can point at a tour file that comes later in the tour
+        others = "\n".join(file_texts.values())
+        for r in results:
+            step = steps[r.index - 1]
+            if r.status == "fail" or not isinstance(step, dict) or "file" not in step:
+                continue
+            f = norm_path(step["file"])
             missing = _mention_warnings(step.get("description", ""), file_texts.get(f, ""), repo.paths)
-            if missing:
-                # a mention can legitimately point at another tour file
-                others = "\n".join(file_texts.values())
-                missing = [m for m in missing if not re.search(r"(?<![\w$])" + re.escape(re.split(r"\.|::|->|#", m.replace("()", ""))[-1]) + r"(?![\w$])", others)]
+            missing = [m for m in missing if not re.search(r"(?<![\w$])" + re.escape(re.split(r"\.|::|->|#", m.replace("()", ""))[-1]) + r"(?![\w$])", others)]
             if missing:
                 if r.status == "ok":
                     r.status = "warn"

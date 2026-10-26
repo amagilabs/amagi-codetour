@@ -53,12 +53,14 @@ def static_description(pick, index: int, total: int) -> str:
     return "\n\n".join(parts)
 
 
-def readme_step(plan, repo=None) -> dict:
+def readme_step(plan, repo=None, files=None) -> dict:
+    """Overview step on the README. `files`: the tour's files in order (default: the plan's picks)."""
     langs = ", ".join(plan.languages) if plan.languages else "no recognised source"
-    entry = plan.picks[0].path if plan.picks else ""
+    files = [p.path for p in plan.picks] if files is None else files
+    entry = files[0] if files else ""
     text = (
         f"Welcome to **{plan.name}**. Start with the README for what the project is for.\n\n"
-        f"This tour walks through {len(plan.picks)} files in reading order"
+        f"This tour walks through {len(files)} files in reading order"
         + (f", starting at the entry point `{entry}`" if entry else "")
         + f". Languages found: {langs}."
     )

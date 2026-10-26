@@ -1,119 +1,126 @@
 {
   "$schema": "https://aka.ms/codetour-schema",
   "title": "Getting started with amagi-codetour",
-  "description": "Follow one `amagi-codetour generate` run from the command line through scanning, planning, the LLM or static writer, anchoring, and the check pass that verifies every step against the code.",
+  "description": "Follows one `generate` run from the CLI through scanning, planning, the LLM prompt, anchor resolution and the `check` pass that verifies every step.",
   "isPrimary": true,
   "steps": [
     {
+      "file": "README.md",
+      "line": 1,
+      "title": "Overview",
+      "description": "Welcome to **amagi-codetour**. Start with the README for what the project is for.\n\nThis tour walks through 11 files in reading order, starting at the entry point `src/amagi_codetour/cli.py`. Languages found: python.",
+      "pattern": "^\\s*# amagi-codetour"
+    },
+    {
       "file": "src/amagi_codetour/cli.py",
-      "line": 255,
-      "title": "Console entry point",
-      "description": "Execution begins here: `pyproject.toml` maps the `amagi-codetour` console script to `main`. It switches stdout and stderr to UTF-8, builds the parser with `build_parser`, then calls the handler stored in `args.func`. A `SystemExit` raised deeper in the code becomes a normal exit code, so each command can stop early by raising one.",
+      "line": 260,
+      "title": "CLI entry point",
+      "description": "Execution starts here. pyproject.toml maps the `amagi-codetour` console script to `amagi_codetour.cli:main`. `main` switches stdout and stderr to UTF-8, builds the parser with `build_parser`, and calls `args.func(args)`, which is `cmd_generate`, `cmd_plan` or `cmd_check` depending on the subcommand. It turns `SystemExit` and `KeyboardInterrupt` into plain exit codes.",
       "pattern": "^\\s*def main\\(argv=None\\) -> int:"
     },
     {
       "file": "src/amagi_codetour/__main__.py",
       "line": 3,
       "title": "python -m entry",
-      "description": "`python -m amagi_codetour` takes this second route into the same `main` function from `cli.py`. Both entry points end up in the same dispatch code.",
+      "description": "Running `python -m amagi_codetour` ends up in the same `main` from `cli.py`, so both entry points behave the same. The return value of `main` becomes the process exit code.",
       "pattern": "^\\s*raise SystemExit\\(main\\(\\)\\)"
     },
     {
       "file": "src/amagi_codetour/cli.py",
-      "line": 209,
-      "title": "Three subcommands",
-      "description": "`build_parser` defines the three subcommands: `generate`, `plan` and `check`. Each one calls `set_defaults(func=...)` to attach its handler (`cmd_generate`, `cmd_plan`, `cmd_check`), and `main` then runs that handler. The `--engine` choices here (`auto`, `static`, `claude`, `anthropic`) decide who writes the tour text.",
-      "pattern": "^\\s*def build_parser\\(\\) -> argparse\\.ArgumentParser:"
-    },
-    {
-      "file": "src/amagi_codetour/cli.py",
       "line": 140,
-      "title": "The generate pipeline",
-      "description": "This handler is the main pipeline: `scan` the repo, `build_plan`, pick an engine with `llm.pick_engine`, then build the tour with either `static_tour` or the prompt, `llm.ask`, `llm.parse_response`, `llm.resolve_steps` chain. If the LLM engine fails under `auto`, it falls back to the static engine. Before writing the file, it runs every step through `check_tour`, and the exit code reflects whether all anchors verified.",
+      "title": "The generate command",
+      "description": "This is the main pipeline. `cmd_generate` calls `scan` to read the repo and `build_plan` to rank files. Then `llm.pick_engine` chooses an engine. The `static` engine builds the tour with `static_tour`. The other engines go through `llm.build_prompt`, `llm.ask`, `llm.parse_response` and `llm.resolve_steps`, and if one of them fails while `--engine` is left on `auto`, it falls back to static. Either way, the finished tour goes through `check_tour` before `write_tour` saves it, and the exit code is 1 if any anchor failed.",
       "pattern": "^\\s*def cmd_generate\\(args\\) -> int:"
     },
     {
       "file": "src/amagi_codetour/scan.py",
       "line": 156,
       "title": "Scanning the repo",
-      "description": "`scan` lists files with `_git_paths` so `.gitignore` is respected. Without git it falls back to `_walk_paths`. It keeps only files whose extension is in `LANG_BY_EXT`, skips anything over `MAX_BYTES` and anything that looks binary, and stores each file as a `SourceFile`. The resulting `Repo` object is used by every later stage, and `Repo.read` can still read non-source files such as the README.",
+      "description": "`scan` lists the repo's files with `_git_paths` (`git ls-files`, so .gitignore is respected). If git is unavailable it falls back to `_walk_paths`. Files with an extension in `LANG_BY_EXT` are read into `SourceFile` objects, and binary files and files over `MAX_BYTES` are skipped. The `Repo` it returns, and especially `Repo.read`, is what every later step uses to look at file contents.",
       "pattern": "^\\s*def scan\\(root, use_git: bool = True\\) -> Repo:"
     },
     {
       "file": "src/amagi_codetour/plan.py",
-      "line": 198,
-      "title": "Ranking files statically",
-      "description": "`build_plan` decides which files the tour covers, without calling any LLM. It scores every non-test file: +100 for entry points, more for files closer to them in the import graph (`_bfs`), more for files with many importers and for names in `NAME_HINTS`, and less for trivial or low-value files. It then orders the chosen files breadth-first from the entry points along imports. The result is a `Plan` with ordered `picks` and the full `ranked` list.",
+      "line": 203,
+      "title": "Ranking files into a plan",
+      "description": "`build_plan` is the static brain behind both `plan` and `generate`. It builds the import graph, finds entry points, and runs `_bfs` from the strongest entries. Each file's score comes from entry status, import hops, number of importers, size, `NAME_HINTS` and penalties for trivial or low-value files. It then picks between `min_files` and `max_files` files, puts them in breadth-first reading order, and gives each `FilePick` an anchor line.",
       "pattern": "^\\s*def build_plan\\(repo, min_files: int = 8, max_files: int = 15\\) -> Plan:"
     },
     {
       "file": "src/amagi_codetour/entry.py",
       "line": 204,
       "title": "Finding entry points",
-      "description": "`find_entries` merges candidates from `python_entries`, `js_entries` and `other_entries` and keeps the strongest `Entry` for each path. Console scripts in `pyproject.toml` score 100, which is why `cli.py` ranks first in this repo. When an entry names a function, such as `cli:main`, that name is stored in `symbol`.",
+      "description": "`find_entries` combines `python_entries`, `js_entries` and `other_entries`. Between them they cover console scripts in pyproject.toml, `__main__.py`, package.json `bin` and `main`, Go `func main`, Rust `src/main.rs` and others. Each `Entry` has a `strength`. Only one entry is kept per path, the strongest, and if a weaker match knew the `symbol` (such as `main`), that symbol is carried over. `build_plan` uses the top entries as roots for the import walk.",
       "pattern": "^\\s*def find_entries\\(repo, is_test=None\\):"
     },
     {
       "file": "src/amagi_codetour/graph.py",
       "line": 258,
-      "title": "The import graph",
-      "description": "`build_graph` returns `edges[src][dst]`, the set of names each file imports from another file in the repo. It sends each file to a language-specific resolver: `python_imports` (AST-based), `js_imports`, `go_imports` or `rust_imports`. The planner uses these edges for import distance, importer counts and reading order.",
+      "title": "Building the import graph",
+      "description": "`build_graph` returns `edges[src][dst]`, the set of names one file imports from another. It sends each file to a language-specific parser: `python_imports` (AST-based), `js_imports`, `go_imports` or `rust_imports`. Edges to files outside the repo are dropped. `reverse_edges` turns this into the importer counts that `build_plan` scores with.",
       "pattern": "^\\s*def build_graph\\(repo\\):"
     },
     {
       "file": "src/amagi_codetour/symbols.py",
       "line": 168,
-      "title": "Symbols and summaries",
-      "description": "`file_symbols` returns each file's top-level definitions plus a one-line summary. Python goes through `python_symbols`, which uses `ast` and the module docstring. Other languages go through `regex_symbols` and `_leading_comment`. These `Symbol` records give the planner candidate anchor lines and give static descriptions their content.",
+      "title": "Extracting definitions",
+      "description": "`file_symbols` returns the top-level `Symbol` list and a one-line summary for a file. Python files go through `python_symbols` with the `ast` module. Other languages use the regex tables in `regex_symbols` and `_leading_comment`. The planner uses these symbols to pick anchor lines, and `static_description` uses them to write step text.",
       "pattern": "^\\s*def file_symbols\\(sf\\):"
     },
     {
       "file": "src/amagi_codetour/plan.py",
       "line": 103,
       "title": "Choosing each anchor line",
-      "description": "For each picked file, `_choose_anchor` chooses the line the cursor lands on. It prefers, in order: the function an entry point calls, the symbol other tour files import most, a `__main__` block or `main`, then the first public class or function. The chosen line becomes `anchor_line` on the `FilePick`.",
+      "description": "`_choose_anchor` picks the line a static step points at. If the entry point names a function (the `symbol` from a console script), that function's line wins. Next come the names that other tour files import most, then an `if __name__ == \"__main__\"` block or `main`, and finally the first public class or function. This decides the `anchor_line` and `anchor_symbol` that `plan` prints.",
       "pattern": "^\\s*def _choose_anchor\\(pick, sf, entry, imported_names\\):"
     },
     {
       "file": "src/amagi_codetour/llm.py",
-      "line": 248,
-      "title": "Picking an engine",
-      "description": "`pick_engine` decides who writes the tour. `--llm-cmd` always wins. Under `auto`, it picks `anthropic` if `ANTHROPIC_API_KEY` is set and the SDK imports, then `claude` if the CLI is on PATH, and otherwise `static`. After that, `ask` sends the prompt to `run_command`, `run_claude_cli` or `run_anthropic`.",
-      "pattern": "^\\s*def pick_engine\\(engine: str, llm_cmd: str = \"\"\\) -> str:"
+      "line": 53,
+      "title": "Building the LLM prompt",
+      "description": "`build_prompt` puts together the README head, the file list, the entry candidates and the static ranking. It then adds line-numbered listings from `_numbered`, staying within `MAX_PROMPT_CHARS`. The rules ask for JSON in which every step copies its line's exact text into `anchor`. That quoted text is what lets `resolve_steps` check the model's output.",
+      "pattern": "^\\s*def build_prompt\\(repo, plan, min_files: int = 8, max_files: int = 15, title: str = \"\"\\) -> str:"
     },
     {
       "file": "src/amagi_codetour/llm.py",
       "line": 118,
-      "title": "Verifying model steps",
-      "description": "The model never sets a line number directly. Each returned step must quote the exact text of its line as `anchor`, and `resolve_steps` searches the file for that text with `locate`. Steps that cannot be found are dropped and recorded in `notes`. If too few files survive, the function fills in from the static plan using `static_description`.",
+      "title": "Verifying the model's steps",
+      "description": "`resolve_steps` turns the parsed reply into CodeTour steps. It drops any step whose file is not in the repo or whose `anchor` cannot be found by `locate`. If the model's line number is wrong, the step moves to the line that actually holds the quoted text, and a note is added. It also caps the number of files and the steps per file. If fewer than `min_files` files are covered, it fills the gap from `plan.picks`.",
       "pattern": "^\\s*def resolve_steps\\(repo, plan, data: dict, min_files: int = 8, max_files: int = 15,"
     },
     {
       "file": "src/amagi_codetour/anchors.py",
       "line": 48,
       "title": "Matching quoted lines",
-      "description": "`locate` turns quoted text into a line number. It tries an exact match first (ignoring whitespace), then a substring match, then a fuzzy match with `difflib` at a ratio of 0.85 or higher. When several lines match, the one nearest the model's `hint` wins. Earlier in this file, `pattern_for` builds the regex `pattern` stored on each step so drift can be detected later.",
+      "description": "`locate` looks for an anchor in a file in a fixed order. It tries an exact match ignoring whitespace first, then a substring match for anchors of at least 8 characters, then a `difflib` fuzzy match at 0.85 similarity or higher. When several lines match, the one closest to the model's `hint` wins. The returned `how` tells `resolve_steps` which note to emit.",
       "pattern": "^\\s*def locate\\(anchor: str, lines, hint: int = 0\\):"
     },
     {
+      "file": "src/amagi_codetour/anchors.py",
+      "line": 22,
+      "title": "Patterns that detect drift",
+      "description": "`pattern_for` turns a line into a regex: `^\\s*` followed by the stripped text, escaped by `regex_escape` so that both Python and JavaScript accept it. Every saved step stores this as `pattern` next to `line`. `find_pattern` searches for it later and sorts hits by distance from the old line number.",
+      "pattern": "^\\s*def pattern_for\\(line_text: str\\) -> str:"
+    },
+    {
       "file": "src/amagi_codetour/tour.py",
-      "line": 80,
-      "title": "Building a CodeTour step",
-      "description": "Every file step in a generated tour is built here. `make_step` records `file`, `line`, `title` and `description`, and when the line isn't blank it adds a `pattern` from `pattern_for`. `static_tour` below uses it to build a complete tour from the plan without an LLM, and `write_tour` saves the JSON.",
+      "line": 82,
+      "title": "Writing a step",
+      "description": "`make_step` is where every file step, LLM or static, gets its final shape: `file`, `line`, `title`, `description`, plus a `pattern` from `pattern_for` when the line is not blank. The same module's `static_tour` uses it to build a whole tour from the plan. `write_tour` saves the JSON under `.tours/`.",
       "pattern": "^\\s*def make_step\\(repo, path: str, line: int, title: str, description: str\\) -> dict:"
     },
     {
       "file": "src/amagi_codetour/check.py",
       "line": 90,
-      "title": "The validation pass",
-      "description": "`check_tour` checks every step against the files on disk. A step fails if its file is missing, its line is out of range, or the anchored line no longer matches its `pattern`. When the pattern turns up elsewhere in the file, the new line goes into `new_line`. Backticked names in a description that don't appear in any tour file produce warnings. Both `generate` and `check` use the resulting `TourReport`.",
+      "title": "Checking a tour",
+      "description": "`check_tour` runs `schema_errors` and then checks each step against the files on disk. A step fails if its file is missing, its line is past the end of the file, or its line no longer matches its `pattern`. When the pattern turns up elsewhere in the file, the step records `new_line`. Blank anchor lines, steps without a pattern, and backticked names that do not appear in the file only produce warnings. Both `cmd_generate` and `cmd_check` use the `TourReport` it returns.",
       "pattern": "^\\s*def check_tour\\(repo, tour: dict, path: str = \"\", check_mentions: bool = True\\) -> TourReport:"
     },
     {
       "file": "src/amagi_codetour/check.py",
-      "line": 171,
-      "title": "Repairing drifted steps",
-      "description": "`apply_fixes` is what `check --fix` runs. It moves each drifted step to the `new_line` that `check_tour` found, and adds a `pattern` to any step that lacks one so future drift can be caught. `cmd_check` in `cli.py` then writes the tour back and checks it again.",
+      "line": 175,
+      "title": "Fixing drifted steps",
+      "description": "`check --fix` calls `apply_fixes`. Each drifted step with a `new_line` moves to that line. Passing steps that have a `line` but no `pattern` get a pattern added from `pattern_for`, so later drift can be caught. `cmd_check` then writes the tour and checks it again.",
       "pattern": "^\\s*def apply_fixes\\(repo, tour: dict, report: TourReport\\) -> int:"
     },
     {
