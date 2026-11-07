@@ -10,8 +10,6 @@ Generate a VS Code CodeTour for any repo. Claude walks from the entry point thro
 pipx install amagi-codetour
 ```
 
-Not on PyPI yet. Until it is, install from a clone with `pipx install .` or `pip install .`
-
 Python 3.9 or newer, no required dependencies. To write the tour with Claude you need either the [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (`claude`) logged in, or an Anthropic API key with `pipx install "amagi-codetour[anthropic]"`. Without either, `--engine static` builds the tour from the import graph alone.
 
 Open the result in VS Code with the [CodeTour extension](https://marketplace.visualstudio.com/items?itemName=vsls-contrib.codetour). It picks up `.tours/` on its own.
